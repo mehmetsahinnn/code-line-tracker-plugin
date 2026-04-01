@@ -1,0 +1,94 @@
+<idea-plugin>
+    <id>com.codelinetracker</id>
+    <name>Code Line Tracker</name>
+    <vendor>CodeLineTracker</vendor>
+    <description><![CDATA[
+Code Line Tracker gives you real-time visibility into your coding activity, right in the status bar.
+Ever wondered how many lines you actually write, refactor, or delete in a session? Now you can see it at a glance.
+
+<h3>Features</h3>
+<ul>
+    <li><b>Live Line Counter</b> — See <code>+added</code> and <code>-deleted</code> lines updating in real-time as you code</li>
+    <li><b>Commit Mode</b> — Automatically activates when you open the Commit panel, showing VCS diff stats for your staged changes</li>
+    <li><b>Per-File Breakdown</b> — Click the widget to see detailed stats for each file you have touched</li>
+    <li><b>File Selection</b> — Select specific files in the popup to see aggregated stats for only those files</li>
+    <li><b>Commit Selected</b> — Exclude files from commit directly from the popup, then press Commit Selected to open the Commit panel with only your chosen files</li>
+    <li><b>Changes Tab Decoration</b> — Each changelist shows its own diff totals based on the files it contains</li>
+</ul>
+
+<h3>Why Use It?</h3>
+<ul>
+    <li>Track your daily coding output for standups and reports</li>
+    <li>Prove your productivity — especially useful when your company tracks lines-per-commit metrics</li>
+    <li>Get a quick overview before committing: how big is this change?</li>
+    <li>Zero configuration — install and it just works</li>
+</ul>
+
+<h3>How It Works</h3>
+<ol>
+    <li><b>Session Mode</b> — Tracks every edit in real-time using git diff</li>
+    <li><b>Commit Mode</b> — Auto-switches when the Commit panel opens, calculates actual VCS diffs for staged files</li>
+    <li>Click the <code>Total : N || +N -N</code> widget in the status bar for the full per-file breakdown</li>
+</ol>
+    ]]></description>
+
+    <change-notes><![CDATA[
+<h3>1.1.29 — Per-Changelist Diff Stats</h3>
+<ul>
+    <li>Each changelist folder now shows its own diff totals based on the files it contains</li>
+    <li>The "[CLT] Temporarily Excluded from Commit" folder shows excluded files' totals separately</li>
+</ul>
+
+<h3>1.1.25 — Real-Time Commit Selection</h3>
+<ul>
+    <li><b>Instant changelist sync</b> — Unchecking a file in the popup immediately moves it to the excluded changelist; checking it moves it back to Changes</li>
+    <li><b>Commit Selected button</b> — Opens the Commit panel with only your selected files ready to commit</li>
+    <li>New display format: <code>Total : XX || +N -N</code></li>
+    <li>Excluded changelist renamed to "[CLT] Temporarily Excluded from Commit" for clarity</li>
+    <li>Excluded files are automatically restored when the Commit panel closes or the plugin is disposed</li>
+</ul>
+
+<h3>1.1.22 — Commit Mode Fix &amp; Total Counter</h3>
+<ul>
+    <li><b>Commit Mode now works correctly</b> — Switched from <code>git diff --cached</code> to <code>git diff HEAD</code> since IntelliJ does not stage files until commit</li>
+    <li>Added total line count (added + deleted) to status bar, popup, and Changes tab decorator</li>
+</ul>
+
+<h3>1.1.20 — Accurate Real-Time Tracking</h3>
+<ul>
+    <li><b>Bug fix</b>: Files are now saved to disk before running git diff — previously, in-memory edits were not detected</li>
+    <li><b>Bug fix</b>: Added <code>DocumentListener</code> with 1.5s debounce for real-time change detection on every edit</li>
+    <li><b>Bug fix</b>: Removed unversioned/untracked files from diff output — only tracked files are shown</li>
+</ul>
+
+<h3>1.1.18 — Git Diff Engine Rewrite</h3>
+<ul>
+    <li><b>Bug fix</b>: Separated stderr from stdout to prevent git warnings from corrupting diff output</li>
+    <li><b>Bug fix</b>: Removed strict <code>.git</code> directory check — plugin now works in subdirectories of git repos</li>
+    <li><b>Bug fix</b>: Added 10-second timeout to prevent process hangs</li>
+    <li>Added <code>--no-renames</code> flag for accurate per-file line counts</li>
+    <li>Fallback for repos with no HEAD commit</li>
+</ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>Git4Idea</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService
+                serviceImplementation="com.codelinetracker.service.SessionTrackerService"/>
+
+        <projectService
+                serviceImplementation="com.codelinetracker.service.CommitTrackerService"/>
+
+        <statusBarWidgetFactory
+                id="CodeLineTrackerWidget"
+                implementation="com.codelinetracker.widget.LineStatsWidgetFactory"/>
+
+        <vcs.changeListDecorator
+                implementation="com.codelinetracker.vcs.LineChangeListDecorator"/>
+
+        <postStartupActivity
+                implementation="com.codelinetracker.service.TrackerStartupActivity"/>
+    </extensions>
+</idea-plugin>

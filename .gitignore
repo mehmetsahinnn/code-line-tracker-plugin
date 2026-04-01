@@ -1,0 +1,24 @@
+# Build output
+build/
+out/
+
+# Gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# IntelliJ Platform SDK
+.intellijPlatform/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
