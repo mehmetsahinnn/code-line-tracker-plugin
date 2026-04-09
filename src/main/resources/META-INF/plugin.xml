@@ -11,7 +11,8 @@ Ever wondered how many lines you actually write, refactor, or delete in a sessio
     <li><b>Live Line Counter</b> — See <code>+added</code> and <code>-deleted</code> lines updating in real-time as you code</li>
     <li><b>Commit Mode</b> — Automatically activates when you open the Commit panel, showing VCS diff stats for your staged changes</li>
     <li><b>Per-File Breakdown</b> — Click the widget to see detailed stats for each file you have touched</li>
-    <li><b>File Selection</b> — Select specific files in the popup to see aggregated stats for only those files</li>
+    <li><b>File Selection</b> — Select specific files in the popup to see aggregated stats, with Select All / None shortcuts</li>
+    <li><b>Sort Toggle</b> — Switch between alphabetical (A-Z) and most-changed-first sorting</li>
     <li><b>Commit Selected</b> — Exclude files from commit directly from the popup, then press Commit Selected to open the Commit panel with only your chosen files</li>
     <li><b>Changes Tab Decoration</b> — Each changelist shows its own diff totals based on the files it contains</li>
 </ul>
@@ -33,6 +34,13 @@ Ever wondered how many lines you actually write, refactor, or delete in a sessio
     ]]></description>
 
     <change-notes><![CDATA[
+<h3>1.1.31 — Sort Toggle, Select All / None</h3>
+<ul>
+    <li><b>Sort toggle</b> — Click "Most Changed" or "A-Z" to switch between alphabetical and most-changed-first sorting</li>
+    <li><b>Select All / None</b> — Quickly select or deselect all files in the popup</li>
+    <li>Files are sorted alphabetically (A-Z) by default</li>
+</ul>
+
 <h3>1.1.29 — Per-Changelist Diff Stats</h3>
 <ul>
     <li>Each changelist folder now shows its own diff totals based on the files it contains</li>
