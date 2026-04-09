@@ -201,17 +201,51 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
         content.add(totalRow)
 
         // --- File list ---
-        val files = diff.perFileStats.values.sortedByDescending { it.addedLines + it.deletedLines }
+        val allFiles = diff.perFileStats.values.toList()
+        var sortByName = true
 
-        if (files.isNotEmpty()) {
+        if (allFiles.isNotEmpty()) {
             content.add(Box.createVerticalStrut(8))
             content.add(sep())
             content.add(Box.createVerticalStrut(6))
 
-            val filesHeader = JBLabel("Changed Files (${files.size})")
+            val filesHeaderRow = JPanel(BorderLayout())
+            filesHeaderRow.isOpaque = false
+            filesHeaderRow.alignmentX = Component.LEFT_ALIGNMENT
+            filesHeaderRow.maximumSize = Dimension(POPUP_WIDTH, 22)
+
+            val filesHeader = JBLabel("Changed Files (${allFiles.size})")
             filesHeader.font = filesHeader.font.deriveFont(Font.BOLD, 12f)
-            filesHeader.alignmentX = Component.LEFT_ALIGNMENT
-            content.add(filesHeader)
+            filesHeaderRow.add(filesHeader, BorderLayout.WEST)
+
+            val actionBtns = JPanel(FlowLayout(FlowLayout.RIGHT, 6, 0))
+            actionBtns.isOpaque = false
+
+            val sortBtn = JBLabel("Most Changed")
+            sortBtn.foreground = link
+            sortBtn.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            sortBtn.font = sortBtn.font.deriveFont(11f)
+
+            val selectAllBtn = JBLabel("All")
+            selectAllBtn.foreground = link
+            selectAllBtn.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            selectAllBtn.font = selectAllBtn.font.deriveFont(11f)
+
+            val unselectAllBtn = JBLabel("None")
+            unselectAllBtn.foreground = link
+            unselectAllBtn.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            unselectAllBtn.font = unselectAllBtn.font.deriveFont(11f)
+
+            val divider1 = JBLabel("|")
+            divider1.foreground = JBColor.GRAY
+            divider1.font = divider1.font.deriveFont(11f)
+
+            actionBtns.add(sortBtn)
+            actionBtns.add(divider1)
+            actionBtns.add(selectAllBtn)
+            actionBtns.add(unselectAllBtn)
+            filesHeaderRow.add(actionBtns, BorderLayout.EAST)
+            content.add(filesHeaderRow)
             content.add(Box.createVerticalStrut(6))
 
             val selectedLabel = JBLabel()
@@ -224,7 +258,7 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
             listPanel.layout = BoxLayout(listPanel, BoxLayout.Y_AXIS)
             listPanel.isOpaque = false
 
-            for (f in files) {
+            fun buildFileRow(f: FileLineStat): Pair<JPanel, Pair<JCheckBox, FileLineStat>> {
                 val row = JPanel(BorderLayout(4, 0))
                 row.isOpaque = false
                 row.alignmentX = Component.LEFT_ALIGNMENT
@@ -262,8 +296,7 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
                 nums.add(dl)
                 row.add(nums, BorderLayout.EAST)
 
-                checks.add(Pair(cb, f))
-                listPanel.add(row)
+                return Pair(row, Pair(cb, f))
             }
 
             fun updateSel() {
@@ -271,22 +304,73 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
                 val sa = sel.sumOf { it.addedLines }
                 val sd = sel.sumOf { it.deletedLines }
                 val st = sa + sd
-                selectedLabel.text = "Selected (${sel.size}/${files.size}) : $st || +$sa -$sd"
+                selectedLabel.text = "Selected (${sel.size}/${allFiles.size}) : $st || +$sa -$sd"
             }
 
-            for ((cb, fileStat) in checks) {
-                cb.addActionListener {
-                    if (cb.isSelected) {
-                        moveToDefaultList(fileStat.filePath)
-                    } else {
-                        moveToExcludedList(fileStat.filePath)
+            fun rebuildList() {
+                val sorted = if (sortByName) {
+                    allFiles.sortedBy { it.fileName.lowercase() }
+                } else {
+                    allFiles.sortedByDescending { it.addedLines + it.deletedLines }
+                }
+
+                val selectedPaths = checks.filter { it.first.isSelected }.map { it.second.filePath }.toSet()
+                checks.clear()
+                listPanel.removeAll()
+
+                for (f in sorted) {
+                    val (row, pair) = buildFileRow(f)
+                    pair.first.isSelected = selectedPaths.contains(f.filePath) || !isInExcludedList(f.filePath)
+                    pair.first.addActionListener {
+                        if (pair.first.isSelected) moveToDefaultList(pair.second.filePath)
+                        else moveToExcludedList(pair.second.filePath)
+                        updateSel()
+                    }
+                    checks.add(pair)
+                    listPanel.add(row)
+                }
+
+                listPanel.revalidate()
+                listPanel.repaint()
+            }
+
+            rebuildList()
+            updateSel()
+
+            sortBtn.addMouseListener(object : MouseAdapter() {
+                override fun mouseClicked(ev: MouseEvent) {
+                    sortByName = !sortByName
+                    sortBtn.text = if (sortByName) "Most Changed" else "A-Z"
+                    rebuildList()
+                    updateSel()
+                }
+            })
+
+            selectAllBtn.addMouseListener(object : MouseAdapter() {
+                override fun mouseClicked(ev: MouseEvent) {
+                    for ((cb, fileStat) in checks) {
+                        if (!cb.isSelected) {
+                            cb.isSelected = true
+                            moveToDefaultList(fileStat.filePath)
+                        }
                     }
                     updateSel()
                 }
-            }
-            updateSel()
+            })
 
-            val listHeight = minOf(files.size * 28, 280)
+            unselectAllBtn.addMouseListener(object : MouseAdapter() {
+                override fun mouseClicked(ev: MouseEvent) {
+                    for ((cb, fileStat) in checks) {
+                        if (cb.isSelected) {
+                            cb.isSelected = false
+                            moveToExcludedList(fileStat.filePath)
+                        }
+                    }
+                    updateSel()
+                }
+            })
+
+            val listHeight = minOf(allFiles.size * 28, 280)
             val scroll = JBScrollPane(listPanel)
             scroll.alignmentX = Component.LEFT_ALIGNMENT
             scroll.border = JBUI.Borders.empty()
