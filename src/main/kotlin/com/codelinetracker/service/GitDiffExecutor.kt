@@ -2,11 +2,13 @@ package com.codelinetracker.service
 
 import com.codelinetracker.model.DiffResult
 import com.codelinetracker.model.FileLineStat
+import com.intellij.openapi.diagnostic.Logger
 import java.io.File
 import java.util.concurrent.TimeUnit
 
 object GitDiffExecutor {
 
+    private val LOG = Logger.getInstance(GitDiffExecutor::class.java)
     private const val TIMEOUT_SEC = 10L
 
     fun diffAll(basePath: String?): DiffResult {
@@ -27,22 +29,35 @@ object GitDiffExecutor {
     }
 
     private fun runGit(dir: File, vararg command: String): String? {
+        if (!dir.isDirectory) return null
         return try {
-            val process = ProcessBuilder(*command)
-                .directory(dir)
-                .start()
+            val process = ProcessBuilder(*command).directory(dir).start()
 
-            Thread { process.errorStream.bufferedReader().readText() }.start()
+            val stderr = StringBuilder()
+            val errThread = Thread({
+                try {
+                    process.errorStream.bufferedReader().use { r ->
+                        r.lineSequence().forEach { stderr.appendLine(it) }
+                    }
+                } catch (_: Exception) {}
+            }, "CLT-git-stderr").apply { isDaemon = true; start() }
 
             val stdout = process.inputStream.bufferedReader().readText()
 
             if (!process.waitFor(TIMEOUT_SEC, TimeUnit.SECONDS)) {
                 process.destroyForcibly()
+                errThread.join(500)
+                LOG.debug("git timed out: ${command.joinToString(" ")}")
                 return null
             }
+            errThread.join(500)
 
-            if (process.exitValue() != 0) null else stdout
-        } catch (_: Exception) {
+            if (process.exitValue() != 0) {
+                LOG.debug("git failed (exit=${process.exitValue()}): ${command.joinToString(" ")} :: $stderr")
+                null
+            } else stdout
+        } catch (e: Exception) {
+            LOG.debug("git error: ${command.joinToString(" ")}", e)
             null
         }
     }
