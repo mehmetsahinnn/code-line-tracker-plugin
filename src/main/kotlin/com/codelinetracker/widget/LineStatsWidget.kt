@@ -130,8 +130,11 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
         val change = tempList.changes.find { matchPath(it, basePath) == filePath } ?: return
         clManager.moveChangesTo(defaultList, change)
 
-        if (tempList.changes.size <= 1) {
-            clManager.removeChangeList(tempList)
+        com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+            val current = clManager.findChangeList(TEMP_LIST_NAME) ?: return@invokeLater
+            if (current.changes.isEmpty()) {
+                clManager.removeChangeList(current)
+            }
         }
     }
 

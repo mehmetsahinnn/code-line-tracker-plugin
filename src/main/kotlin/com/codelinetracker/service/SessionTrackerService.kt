@@ -4,17 +4,22 @@ import com.codelinetracker.model.DiffResult
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
-import java.util.Timer
-import java.util.TimerTask
-import java.util.concurrent.atomic.AtomicLong
+import com.intellij.util.concurrency.AppExecutorUtil
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 private const val DEBOUNCE_MS = 1500L
 private const val PERIODIC_REFRESH_MS = 30_000L
@@ -26,14 +31,19 @@ class SessionTrackerService(private val project: Project) : Disposable {
     var currentDiff: DiffResult = DiffResult()
         private set
 
-    private val listeners = mutableListOf<() -> Unit>()
-    private var periodicTimer: Timer? = null
-    private val debounceToken = AtomicLong(0)
+    private val listeners = CopyOnWriteArrayList<() -> Unit>()
+    private val scheduler: ScheduledExecutorService =
+        AppExecutorUtil.createBoundedScheduledExecutorService("CodeLineTracker-${project.name}", 1)
+    private val pendingDebounce = AtomicReference<ScheduledFuture<*>?>(null)
+    private var periodicHandle: ScheduledFuture<*>? = null
 
     fun init() {
         EditorFactory.getInstance().eventMulticaster.addDocumentListener(
             object : DocumentListener {
                 override fun documentChanged(event: DocumentEvent) {
+                    if (project.isDisposed) return
+                    val file = FileDocumentManager.getInstance().getFile(event.document) ?: return
+                    if (!ProjectFileIndex.getInstance(project).isInContent(file)) return
                     scheduleRefresh()
                 }
             }, this
@@ -43,38 +53,45 @@ class SessionTrackerService(private val project: Project) : Disposable {
             VirtualFileManager.VFS_CHANGES,
             object : BulkFileListener {
                 override fun after(events: MutableList<out VFileEvent>) {
-                    scheduleRefresh()
+                    if (project.isDisposed) return
+                    val idx = ProjectFileIndex.getInstance(project)
+                    val touches = events.any { ev ->
+                        val f = ev.file ?: return@any false
+                        idx.isInContent(f)
+                    }
+                    if (touches) scheduleRefresh()
                 }
             }
         )
 
-        periodicTimer = Timer("CodeLineTracker-Periodic", true).apply {
-            schedule(object : TimerTask() {
-                override fun run() { refresh() }
-            }, 0L, PERIODIC_REFRESH_MS)
-        }
+        periodicHandle = scheduler.scheduleWithFixedDelay(
+            { refresh() }, 0L, PERIODIC_REFRESH_MS, TimeUnit.MILLISECONDS
+        )
     }
 
     private fun scheduleRefresh() {
-        val token = debounceToken.incrementAndGet()
-        Timer("CodeLineTracker-Debounce", true).schedule(object : TimerTask() {
-            override fun run() {
-                if (debounceToken.get() == token) {
-                    refresh()
-                }
-            }
-        }, DEBOUNCE_MS)
+        if (project.isDisposed) return
+        val next = try {
+            scheduler.schedule({ refresh() }, DEBOUNCE_MS, TimeUnit.MILLISECONDS)
+        } catch (_: Exception) {
+            return
+        }
+        pendingDebounce.getAndSet(next)?.cancel(false)
     }
 
     fun refresh() {
+        if (project.isDisposed) return
         ApplicationManager.getApplication().invokeLater {
-            FileDocumentManager.getInstance().saveAllDocuments()
+            if (project.isDisposed) return@invokeLater
+            val fdm = FileDocumentManager.getInstance()
+            fdm.unsavedDocuments.forEach { fdm.saveDocument(it) }
 
             ApplicationManager.getApplication().executeOnPooledThread {
+                if (project.isDisposed) return@executeOnPooledThread
                 val result = GitDiffExecutor.diffAll(project.basePath)
                 currentDiff = result
                 ApplicationManager.getApplication().invokeLater {
-                    notifyListeners()
+                    if (!project.isDisposed) notifyListeners()
                 }
             }
         }
@@ -89,16 +106,20 @@ class SessionTrackerService(private val project: Project) : Disposable {
     }
 
     private fun notifyListeners() {
-        listeners.toList().forEach { it() }
+        listeners.forEach {
+            try { it() } catch (e: Exception) { LOG.warn(e) }
+        }
     }
 
     override fun dispose() {
-        periodicTimer?.cancel()
-        periodicTimer = null
+        periodicHandle?.cancel(false)
+        pendingDebounce.getAndSet(null)?.cancel(false)
+        scheduler.shutdownNow()
         listeners.clear()
     }
 
     companion object {
+        private val LOG = Logger.getInstance(SessionTrackerService::class.java)
         fun getInstance(project: Project): SessionTrackerService {
             return project.getService(SessionTrackerService::class.java)
         }
