@@ -84,9 +84,7 @@ class SessionTrackerService(private val project: Project) : Disposable {
         // Never save documents here: saving while typing closes the code completion popup.
         ApplicationManager.getApplication().executeOnPooledThread {
             if (project.isDisposed) return@executeOnPooledThread
-            val unsaved = GitDiffExecutor.collectUnsavedDocuments(project)
-            val result = GitDiffExecutor.diffAllWithUnsaved(project.basePath, unsaved)
-            currentDiff = result
+            currentDiff = GitDiffExecutor.diffProject(project)
             ApplicationManager.getApplication().invokeLater {
                 if (!project.isDisposed) notifyListeners()
             }

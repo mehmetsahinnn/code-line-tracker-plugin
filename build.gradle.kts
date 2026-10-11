@@ -80,7 +80,9 @@ tasks {
         }
     }
 
+    // Bump after a successful build so failed builds don't burn version numbers.
+    // The plugin just built keeps the current version; the next build gets the bumped one.
     named("buildPlugin") {
-        dependsOn("bumpVersion")
+        finalizedBy("bumpVersion")
     }
 }

@@ -31,13 +31,7 @@ class LineChangeListDecorator(private val project: Project) : ChangeListDecorato
         val listChanges = changeList.changes
         if (listChanges.isEmpty()) return
 
-        val listPaths = listChanges.mapNotNull { change ->
-            val vf = change.virtualFile
-            if (vf != null) return@mapNotNull vf.path.removePrefix("$basePath/")
-            val after = change.afterRevision?.file?.path
-            if (after != null) return@mapNotNull after.removePrefix("$basePath/")
-            change.beforeRevision?.file?.path?.removePrefix("$basePath/")
-        }.toSet()
+        val listPaths = listChanges.mapNotNull { relativePath(it, basePath) }.toSet()
 
         var added = 0
         var deleted = 0

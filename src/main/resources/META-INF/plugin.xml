@@ -15,6 +15,11 @@ Ever wondered how many lines you actually write, refactor, or delete in a sessio
     <li><b>Sort Toggle</b> — Switch between alphabetical (A-Z) and most-changed-first sorting</li>
     <li><b>Commit Selected</b> — Exclude files from commit directly from the popup, then press Commit Selected to open the Commit panel with only your chosen files</li>
     <li><b>Changes Tab Decoration</b> — Each changelist shows its own diff totals based on the files it contains</li>
+    <li><b>Line Limit</b> — Set a per-commit line limit (default 500); the status bar turns green, yellow or red as you approach it</li>
+    <li><b>Commit Check</b> — Get a confirmation dialog before committing more lines than your limit</li>
+    <li><b>Fit to Limit</b> — One click picks the files that fit within the limit, so large changes are easy to split. Related files, such as a class and its test, stay together</li>
+    <li><b>Branch View</b> — See the total size of your branch compared with main, roughly what your pull request will contain</li>
+    <li><b>Ignore Patterns</b> — Lock files, minified and generated files are left out of the counts (configurable)</li>
 </ul>
 
 <h3>Why Use It?</h3>
@@ -22,18 +27,31 @@ Ever wondered how many lines you actually write, refactor, or delete in a sessio
     <li>Track your daily coding output for standups and reports</li>
     <li>Prove your productivity — especially useful when your company tracks lines-per-commit metrics</li>
     <li>Get a quick overview before committing: how big is this change?</li>
-    <li>Zero configuration — install and it just works</li>
+    <li>Keep commits small and reviewable — especially useful when your team has a lines-per-commit limit</li>
+    <li>Zero configuration — install and it just works; tune it under <i>Settings → Tools → Code Line Tracker</i></li>
 </ul>
 
 <h3>How It Works</h3>
 <ol>
     <li><b>Session Mode</b> — Tracks every edit in real-time using git diff</li>
     <li><b>Commit Mode</b> — Auto-switches when the Commit panel opens, calculates actual VCS diffs for staged files</li>
-    <li>Click the <code>Total : N || +N -N</code> widget in the status bar for the full per-file breakdown</li>
+    <li>Click the widget in the status bar for the full per-file breakdown</li>
 </ol>
     ]]></description>
 
     <change-notes><![CDATA[
+<h3>1.2.6 — Commit Line Limit</h3>
+<ul>
+    <li><b>Cleaner popup</b> — Changes and Branch tabs, one progress bar for the limit, a single select-all checkbox, and a commit button that shows how many files and lines you are about to commit</li>
+    <li><b>Compact status bar</b> — Shows <code>575 / 500</code> with a colored dot; added and deleted lines are in the tooltip</li>
+    <li><b>Line limit</b> — Set a per-commit limit in <i>Settings → Tools → Code Line Tracker</i> (default 500). The status bar shows a green, yellow or red dot as you approach and pass it</li>
+    <li><b>Commit check</b> — Committing more lines than the limit asks for confirmation first</li>
+    <li><b>Fit to limit</b> — When you are over the limit, one click in the popup selects the files that fit, so you can split the change into smaller commits. Related files (a class and its test, a component and its styles) are never split apart</li>
+    <li><b>Commit tab sync</b> — Checking or unchecking files in the popup now also checks or unchecks them in the Commit tool window</li>
+    <li><b>Branch view</b> — Click "Branch ▸" in the popup to see how big your branch is compared with main, including uncommitted work. Optionally set a pull request line limit in Settings</li>
+    <li><b>Ignore patterns</b> — Lock files, minified files, source maps, snapshots and generated code are no longer counted. Edit the list in Settings</li>
+</ul>
+
 <h3>1.1.35 — Code Completion Fix</h3>
 <ul>
     <li>Fixed: code completion popup was closed a few seconds after it appeared while typing — the plugin no longer auto-saves files to count lines</li>
@@ -120,5 +138,14 @@ Ever wondered how many lines you actually write, refactor, or delete in a sessio
 
         <postStartupActivity
                 implementation="com.codelinetracker.service.TrackerStartupActivity"/>
+
+        <applicationConfigurable
+                parentId="tools"
+                id="com.codelinetracker.settings"
+                displayName="Code Line Tracker"
+                instance="com.codelinetracker.settings.TrackerConfigurable"/>
+
+        <checkinHandlerFactory
+                implementation="com.codelinetracker.vcs.LineLimitCheckinHandlerFactory"/>
     </extensions>
 </idea-plugin>

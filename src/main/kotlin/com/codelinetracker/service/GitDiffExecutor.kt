@@ -1,5 +1,6 @@
 package com.codelinetracker.service
 
+import com.codelinetracker.model.BranchDiff
 import com.codelinetracker.model.DiffResult
 import com.codelinetracker.model.FileLineStat
 import com.intellij.openapi.application.ReadAction
@@ -30,6 +31,37 @@ object GitDiffExecutor {
         return merge(parseNumstat(cached), parseNumstat(working))
     }
 
+    /**
+     * Changes on the current branch since it split off [configuredBase] (or an auto-detected base
+     * such as origin/main), including uncommitted and unsaved work — roughly what a pull request
+     * would contain. Null when no base branch can be found.
+     */
+    fun diffBranch(project: Project, configuredBase: String?): BranchDiff? {
+        val dir = project.basePath?.let(::File) ?: return null
+        val branch = runGit(dir, "git", "rev-parse", "--abbrev-ref", "HEAD")?.trim() ?: return null
+        val candidates = if (configuredBase != null) listOf(configuredBase) else baseCandidates(dir)
+        val base = candidates.firstOrNull { refExists(dir, it) } ?: return null
+        val mergeBase = runGit(dir, "git", "merge-base", "HEAD", base)?.trim() ?: return null
+
+        val unsaved = collectUnsavedDocuments(project)
+        val diff = ExclusionFilter.apply(diffAllWithUnsaved(project.basePath, unsaved, mergeBase))
+        return BranchDiff(branch, base, diff)
+    }
+
+    private fun baseCandidates(dir: File): List<String> {
+        val originHead = runGit(dir, "git", "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")?.trim()
+        return listOfNotNull(originHead) + listOf("origin/main", "origin/master", "main", "master")
+    }
+
+    private fun refExists(dir: File, ref: String): Boolean =
+        runGit(dir, "git", "rev-parse", "--verify", "--quiet", "$ref^{commit}") != null
+
+    /** Line counts for the project's uncommitted changes, including unsaved edits, minus ignored files. */
+    fun diffProject(project: Project): DiffResult {
+        val unsaved = collectUnsavedDocuments(project)
+        return ExclusionFilter.apply(diffAllWithUnsaved(project.basePath, unsaved))
+    }
+
     /** Snapshot of unsaved project documents, keyed by path relative to the project base path. */
     fun collectUnsavedDocuments(project: Project): Map<String, String> {
         val basePath = project.basePath ?: return emptyMap()
@@ -46,14 +78,14 @@ object GitDiffExecutor {
     }
 
     /**
-     * Diff of the working tree against HEAD, where files that have unsaved edits in the
+     * Diff of the working tree against [baseRev], where files that have unsaved edits in the
      * editor are diffed in memory instead of being saved first. Saving documents while the
      * user types closes the code completion popup, so we must never do that here.
      *
      * [unsavedDocs] maps a path relative to [basePath] to the current document text.
      */
-    fun diffAllWithUnsaved(basePath: String?, unsavedDocs: Map<String, String>): DiffResult {
-        val onDisk = diffAll(basePath)
+    fun diffAllWithUnsaved(basePath: String?, unsavedDocs: Map<String, String>, baseRev: String = "HEAD"): DiffResult {
+        val onDisk = if (baseRev == "HEAD") diffAll(basePath) else diffAgainst(basePath, baseRev)
         if (unsavedDocs.isEmpty()) return onDisk
         val dir = basePath?.let(::File) ?: return onDisk
 
@@ -62,8 +94,8 @@ object GitDiffExecutor {
 
         val merged = onDisk.perFileStats.toMutableMap()
         for ((relPath, text) in unsavedDocs) {
-            val headText = runGit(dir, "git", "show", "HEAD:./$relPath") ?: ""
-            val (added, deleted) = countLineChanges(headText, text) ?: continue
+            val baseText = runGit(dir, "git", "show", "$baseRev:./$relPath") ?: ""
+            val (added, deleted) = countLineChanges(baseText, text) ?: continue
             val key = prefix + relPath
             if (added == 0 && deleted == 0) merged.remove(key)
             else merged[key] = FileLineStat(key.substringAfterLast('/'), key, added, deleted)
@@ -75,6 +107,12 @@ object GitDiffExecutor {
             merged.size,
             merged
         )
+    }
+
+    private fun diffAgainst(basePath: String?, rev: String): DiffResult {
+        val dir = basePath?.let(::File) ?: return DiffResult()
+        val output = runGit(dir, "git", "diff", rev, NUM_STAT, NO_RENAMES) ?: return DiffResult()
+        return parseNumstat(output)
     }
 
     private fun countLineChanges(before: String, after: String): Pair<Int, Int>? {
