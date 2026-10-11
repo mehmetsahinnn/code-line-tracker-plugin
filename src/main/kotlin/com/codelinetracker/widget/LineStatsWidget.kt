@@ -4,6 +4,7 @@ import com.codelinetracker.model.DiffResult
 import com.codelinetracker.model.FileLineStat
 import com.codelinetracker.service.CommitTrackerService
 import com.codelinetracker.service.SessionTrackerService
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
@@ -15,16 +16,32 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.wm.impl.status.EditorBasedWidget
 import com.intellij.openapi.wm.impl.status.TextPanel
 import com.intellij.ui.JBColor
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.popup.PopupFactoryImpl
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
-import java.awt.*
+import java.awt.BorderLayout
+import java.awt.Color
+import java.awt.Component
+import java.awt.Cursor
+import java.awt.Dimension
+import java.awt.FlowLayout
+import java.awt.Point
+import java.awt.Font
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.File
-import javax.swing.*
+import javax.swing.Box
+import javax.swing.BoxLayout
+import javax.swing.JButton
+import javax.swing.JCheckBox
+import javax.swing.JComponent
+import javax.swing.JPanel
+import javax.swing.JSeparator
+import javax.swing.SwingConstants
+import javax.swing.SwingUtilities
 
 class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStatusBarWidget {
 
@@ -32,6 +49,7 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
         const val WIDGET_ID = "CodeLineTrackerWidget"
         private const val POPUP_WIDTH = 450
         const val TEMP_LIST_NAME = "[CLT] Temporarily Excluded from Commit"
+        private val LOG = Logger.getInstance(LineStatsWidget::class.java)
     }
 
     private val textPanel = TextPanel.WithIconAndArrows()
@@ -46,7 +64,7 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
 
         textPanel.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                togglePopup(e)
+                togglePopup()
             }
         })
     }
@@ -68,7 +86,9 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
         try {
             SessionTrackerService.getInstance(project).removeChangeListener(sessionListener)
             CommitTrackerService.getInstance(project).removeChangeListener(commitListener)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            LOG.debug(e)
+        }
         super<EditorBasedWidget>.dispose()
     }
 
@@ -91,11 +111,11 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
         }
     }
 
-    private fun togglePopup(e: MouseEvent) {
+    private fun togglePopup() {
         activePopup?.let {
             if (!it.isDisposed) { it.cancel(); activePopup = null; return }
         }
-        showDetailsPopup(e)
+        showDetailsPopup()
     }
 
     // --- Changelist helpers ---
@@ -150,7 +170,7 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
 
     // --- Popup ---
 
-    private fun showDetailsPopup(e: MouseEvent) {
+    private fun showDetailsPopup() {
         val (diff, isCommitMode) = getActiveDiff()
         val modeName = if (isCommitMode) "Commit Mode" else "Session Mode"
 
@@ -224,7 +244,7 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
             val actionBtns = JPanel(FlowLayout(FlowLayout.RIGHT, 6, 0))
             actionBtns.isOpaque = false
 
-            val sortBtn = JBLabel("Most Changed")
+            val sortBtn = JBLabel("A-Z ▾")
             sortBtn.foreground = link
             sortBtn.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             sortBtn.font = sortBtn.font.deriveFont(11f)
@@ -317,13 +337,13 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
                     allFiles.sortedByDescending { it.addedLines + it.deletedLines }
                 }
 
-                val selectedPaths = checks.filter { it.first.isSelected }.map { it.second.filePath }.toSet()
+                val priorState = checks.associate { it.second.filePath to it.first.isSelected }
                 checks.clear()
                 listPanel.removeAll()
 
                 for (f in sorted) {
                     val (row, pair) = buildFileRow(f)
-                    pair.first.isSelected = selectedPaths.contains(f.filePath) || !isInExcludedList(f.filePath)
+                    pair.first.isSelected = priorState[f.filePath] ?: !isInExcludedList(f.filePath)
                     pair.first.addActionListener {
                         if (pair.first.isSelected) moveToDefaultList(pair.second.filePath)
                         else moveToExcludedList(pair.second.filePath)
@@ -343,7 +363,7 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
             sortBtn.addMouseListener(object : MouseAdapter() {
                 override fun mouseClicked(ev: MouseEvent) {
                     sortByName = !sortByName
-                    sortBtn.text = if (sortByName) "Most Changed" else "A-Z"
+                    sortBtn.text = if (sortByName) "A-Z ▾" else "Most Changed ▾"
                     rebuildList()
                     updateSel()
                 }
@@ -412,7 +432,10 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
             .createPopup()
 
         activePopup = popup
-        popup.showUnderneathOf(textPanel)
+        // The widget lives at the bottom edge of the frame; open upwards so the popup
+        // doesn't get pushed on top of the status bar.
+        val popupHeight = popup.content.preferredSize.height
+        popup.show(RelativePoint(textPanel, Point(0, -popupHeight - JBUI.scale(4))))
     }
 
     private fun focusCommitPanel() {
@@ -430,7 +453,9 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
                 clManager.moveChangesTo(defaultList, *tempList.changes.toTypedArray())
             }
             clManager.removeChangeList(tempList)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            LOG.debug(e)
+        }
     }
 
     fun cleanupIfEmpty() {
@@ -440,7 +465,9 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
             if (tempList.changes.isEmpty()) {
                 clManager.removeChangeList(tempList)
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            LOG.debug(e)
+        }
     }
 
     private fun openFile(filePath: String) {
@@ -470,6 +497,7 @@ class LineStatsWidget(project: Project) : EditorBasedWidget(project), CustomStat
         row.add(s, BorderLayout.EAST)
         return row
     }
+
 
     private fun sep(): JSeparator {
         val s = JSeparator(SwingConstants.HORIZONTAL)

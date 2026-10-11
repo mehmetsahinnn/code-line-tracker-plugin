@@ -34,6 +34,28 @@ Ever wondered how many lines you actually write, refactor, or delete in a sessio
     ]]></description>
 
     <change-notes><![CDATA[
+<h3>1.1.35 — Code Completion Fix</h3>
+<ul>
+    <li>Fixed: code completion popup was closed a few seconds after it appeared while typing — the plugin no longer auto-saves files to count lines</li>
+    <li>Fixed: details popup no longer covers the status bar</li>
+</ul>
+
+<h3>1.1.34 — IntelliJ IDEA 2026.2 Support</h3>
+<ul>
+    <li>Compatible with IntelliJ IDEA 2026.2 (build 262) — the plugin is no longer reported as incompatible after upgrading</li>
+</ul>
+
+<h3>1.1.33 — Stability &amp; Performance</h3>
+<ul>
+    <li>Plugin no longer slows you down when multiple projects are open at the same time</li>
+    <li>Works smoothly with the latest IntelliJ versions (no deprecated API warnings)</li>
+    <li>Less background noise — only changed files trigger refreshes, not every keystroke in every project</li>
+    <li>Cleaner project shutdown — no leftover background tasks when you close a project</li>
+    <li>Smoother experience in the Commit panel — fewer hiccups when checking/unchecking files</li>
+    <li>Clearer sort toggle button (A-Z ▾ / Most Changed ▾) — shows the current order instead of the next one</li>
+    <li>More reliable git diff handling, with clearer error messages in the IDE log if something goes wrong</li>
+</ul>
+
 <h3>1.1.31 — Sort Toggle, Select All / None</h3>
 <ul>
     <li><b>Sort toggle</b> — Click "Most Changed" or "A-Z" to switch between alphabetical and most-changed-first sorting</li>

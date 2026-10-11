@@ -6,7 +6,6 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.wm.ToolWindow
@@ -118,18 +117,14 @@ class CommitTrackerService(private val project: Project) : Disposable {
 
     private fun doRefresh() {
         if (project.isDisposed) return
-        ApplicationManager.getApplication().invokeLater {
-            if (project.isDisposed) return@invokeLater
-            val fdm = FileDocumentManager.getInstance()
-            fdm.unsavedDocuments.forEach { fdm.saveDocument(it) }
-
-            ApplicationManager.getApplication().executeOnPooledThread {
-                if (project.isDisposed) return@executeOnPooledThread
-                val result = GitDiffExecutor.diffAll(project.basePath)
-                currentDiff = result
-                ApplicationManager.getApplication().invokeLater {
-                    if (!project.isDisposed) notifyListeners()
-                }
+        // Never save documents here: saving while typing closes the code completion popup.
+        ApplicationManager.getApplication().executeOnPooledThread {
+            if (project.isDisposed) return@executeOnPooledThread
+            val unsaved = GitDiffExecutor.collectUnsavedDocuments(project)
+            val result = GitDiffExecutor.diffAllWithUnsaved(project.basePath, unsaved)
+            currentDiff = result
+            ApplicationManager.getApplication().invokeLater {
+                if (!project.isDisposed) notifyListeners()
             }
         }
     }

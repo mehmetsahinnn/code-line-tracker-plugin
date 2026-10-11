@@ -81,18 +81,14 @@ class SessionTrackerService(private val project: Project) : Disposable {
 
     fun refresh() {
         if (project.isDisposed) return
-        ApplicationManager.getApplication().invokeLater {
-            if (project.isDisposed) return@invokeLater
-            val fdm = FileDocumentManager.getInstance()
-            fdm.unsavedDocuments.forEach { fdm.saveDocument(it) }
-
-            ApplicationManager.getApplication().executeOnPooledThread {
-                if (project.isDisposed) return@executeOnPooledThread
-                val result = GitDiffExecutor.diffAll(project.basePath)
-                currentDiff = result
-                ApplicationManager.getApplication().invokeLater {
-                    if (!project.isDisposed) notifyListeners()
-                }
+        // Never save documents here: saving while typing closes the code completion popup.
+        ApplicationManager.getApplication().executeOnPooledThread {
+            if (project.isDisposed) return@executeOnPooledThread
+            val unsaved = GitDiffExecutor.collectUnsavedDocuments(project)
+            val result = GitDiffExecutor.diffAllWithUnsaved(project.basePath, unsaved)
+            currentDiff = result
+            ApplicationManager.getApplication().invokeLater {
+                if (!project.isDisposed) notifyListeners()
             }
         }
     }

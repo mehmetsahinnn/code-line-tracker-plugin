@@ -1,7 +1,9 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "1.9.25"
-    id("org.jetbrains.intellij.platform") version "2.2.1"
+    id("org.jetbrains.kotlin.jvm") version "2.4.10"
+    id("org.jetbrains.intellij.platform") version "2.18.1"
 }
 
 group = providers.gradleProperty("pluginGroup").get()
@@ -39,23 +41,33 @@ intellijPlatform {
 
         ideaVersion {
             sinceBuild = "233"
-            untilBuild = "261.*"
+            untilBuild = "262.*"
         }
     }
 }
 
 intellijPlatform {
     instrumentCode = false
+    // The plugin has no settings pages; this step only added minutes to every build.
+    buildSearchableOptions = false
+
+    pluginVerification {
+        ides {
+            create(IntelliJPlatformType.IntellijIdea, "2026.2")
+        }
+    }
 }
 
 tasks {
     wrapper {
-        gradleVersion = "8.10"
+        gradleVersion = "9.6.1"
     }
 
     register("bumpVersion") {
+        // Resolved at configuration time: calling file() inside doLast captures the
+        // script object, which the configuration cache cannot serialize.
+        val propsFile = layout.projectDirectory.file("gradle.properties").asFile
         doLast {
-            val propsFile = file("gradle.properties")
             val content = propsFile.readText()
             val regex = Regex("""pluginVersion\s*=\s*(\d+)\.(\d+)\.(\d+)""")
             val match = regex.find(content) ?: return@doLast
@@ -70,11 +82,5 @@ tasks {
 
     named("buildPlugin") {
         dependsOn("bumpVersion")
-    }
-}
-
-kotlin {
-    compilerOptions {
-        freeCompilerArgs.add("-Xjvm-default=all")
     }
 }
