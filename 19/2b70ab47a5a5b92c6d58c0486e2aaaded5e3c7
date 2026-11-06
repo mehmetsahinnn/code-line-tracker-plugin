@@ -1,0 +1,35 @@
+build.gradle.kts
+  s_830d71cc463e7a::t_b17e53cf21fb2c 51-58,63,67-69,83-84,86
+  s_830d71cc463e7a::t_3b33a77972e4a2 1-2,5-6,44
+src/main/resources/META-INF/plugin.xml
+  s_830d71cc463e7a::t_efadffb4359277 37-57
+gradle.properties
+  s_830d71cc463e7a::t_b17e53cf21fb2c 3
+  s_830d71cc463e7a::t_9f93adbd8b897a 10
+gradle/wrapper/gradle-wrapper.properties
+  s_830d71cc463e7a::t_f208005306517b 3,5-6
+gradlew
+  s_830d71cc463e7a::t_7b0cc9f2800f14 4,23,32,60,89,203,206,213
+gradlew.bat
+  s_830d71cc463e7a::t_4f7a115c2fc8ff 1-82
+src/main/kotlin/com/codelinetracker/service/GitDiffExecutor.kt
+  s_830d71cc463e7a::t_0834f69ac93042 13-14,19,22-23,29,44-46
+src/main/kotlin/com/codelinetracker/widget/LineStatsWidget.kt
+  s_830d71cc463e7a::t_39b04e13d3a6ed 7,24-30,34-42,50,65,87-89,112,116,171,245,338,344,364,451-453,463-465,496
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "192b70ab47a5a5b92c6d58c0486e2aaaded5e3c7",
+  "prompts": {},
+  "sessions": {
+    "s_830d71cc463e7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc43f5c5-9ac6-4639-9562-addef187433c",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "TCMEHMESAHIN <mehmetsahin@turkcell.com.tr>"
+    }
+  }
+}
