@@ -41,7 +41,7 @@ intellijPlatform {
 
         ideaVersion {
             sinceBuild = "233"
-            untilBuild = "262.*"
+            untilBuild = "263.*"
         }
     }
 }
@@ -53,7 +53,7 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            create(IntelliJPlatformType.IntellijIdea, "2026.2")
+            create(IntelliJPlatformType.IntellijIdea, "2026.3")
         }
     }
 }
