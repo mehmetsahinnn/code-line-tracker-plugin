@@ -1,0 +1,23 @@
+gradle.properties
+  s_830d71cc463e7a::t_5fb0119b1b10ee 3
+src/main/resources/META-INF/plugin.xml
+  s_830d71cc463e7a::t_5fb0119b1b10ee 43-47
+build.gradle.kts
+  s_830d71cc463e7a::t_5fb0119b1b10ee 44,56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cd0f0c58b2b5f4b54feab0fc73f0edbada256042",
+  "prompts": {},
+  "sessions": {
+    "s_830d71cc463e7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc43f5c5-9ac6-4639-9562-addef187433c",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "TCMEHMESAHIN <mehmetsahin@turkcell.com.tr>"
+    }
+  }
+}
